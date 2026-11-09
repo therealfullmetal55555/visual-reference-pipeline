@@ -20,7 +20,7 @@
       x: 7840
     },
     {
-      name: "VVUTURA, CARTI BILLBOARD И ОБЪЕКТЫ",
+      name: "EDITORIAL, БИЛБОРДЫ И ОБЪЕКТЫ",
       prefixes: ["[Editorial]", "[Biomechanics]", "[Object]"],
       x: 9940
     },
@@ -122,17 +122,17 @@
     console.log(`[✓] Created frame "${cat.name}" with ${matchingNodes.length} cards.`);
   }
 
-  // 4. Handle atmosphere assets into existing Mister Dove frame
+  // 4. Handle atmosphere assets into existing section frame
   const atmoNodes = allNodes.filter(n => n.name && n.name.startsWith('[Atmosphere]'));
-  const mdFrame = page.children.find(n => n.name && n.name.includes('Mister Dove'));
-  if (mdFrame && atmoNodes.length > 0) {
+  const targetFrame = page.children.find(n => n.name && (n.name.includes('Mister Dove') || n.name.includes('Окружение')));
+  if (targetFrame && atmoNodes.length > 0) {
     atmoNodes.forEach((node, idx) => {
       node.resize(560, 420);
       node.x = 80 + idx * 620;
       node.y = 1050;
-      mdFrame.appendChild(node);
+      targetFrame.appendChild(node);
     });
-    console.log(`[✓] Appended ${atmoNodes.length} atmosphere layers to Mister Dove frame.`);
+    console.log(`[✓] Appended ${atmoNodes.length} atmosphere layers to target frame.`);
   }
 
   figma.notify("✨ Сетка референсов успешно выстроена!");
