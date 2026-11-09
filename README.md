@@ -84,6 +84,7 @@ visual-reference-pipeline/
 ├── README.md
 ├── scripts/
 │   ├── harvester.py          # Извлечение оригинальных медиа и ведение каталога
+│   ├── arena_harvester.py    # Are.na → локальный архив
 │   ├── sync_notion.py        # Синхронизация манифеста с базой Notion API
 │   └── figma_layout.js       # Модульная авто-верстка сетки для Figma
 ├── config/
@@ -114,3 +115,30 @@ python scripts/sync_notion.py --database-id "your-database-id"
 1. Откройте Figma Desktop с целевым файлом.
 2. Нажмите **`⌥ + ⌘ + I`** (Option + Command + I) для открытия консоли.
 3. Вставьте содержимое [`scripts/figma_layout.js`](scripts/figma_layout.js) и нажмите **Enter**.
+
+
+## Are.na → локальный архив
+
+Для запуска нужен Python 3; дополнительных пакетов для этого сборщика не требуется. Скрипт читает канал Are.na через API v2, сохраняет исходные изображения из `image.original.url` и добавляет записи в существующий JSON-индекс. Он не запускает синхронизацию с Notion и не публикует материалы в Figma. Убедитесь, что у вас есть право сохранить и использовать выбранные материалы.
+
+1. Откройте канал. В адресе `https://www.are.na/username/minimal-typography` его slug — `minimal-typography` (последняя часть адреса).
+2. Для публичного канала токен не нужен:
+
+   ```bash
+   python3 scripts/arena_harvester.py --channel minimal-typography
+   ```
+
+3. Для закрытого канала, доступного вашему аккаунту, войдите в Are.na и создайте персональный токен на [странице токенов](https://www.are.na/developers/personal-access-tokens), выбрав доступ на чтение. Передайте его через окружение и не добавляйте в репозиторий:
+
+   ```bash
+   read -rs "ARENA_API_TOKEN?Токен Are.na: "  # zsh, ввод не отображается
+   export ARENA_API_TOKEN
+   python3 scripts/arena_harvester.py --channel minimal-typography
+   unset ARENA_API_TOKEN
+   ```
+
+   Альтернатива — `--token TOKEN`, но аргументы могут сохраняться в истории команд и отображаться в списке процессов. Токен используется только для запроса к API, а не при скачивании изображений.
+
+Пути по умолчанию: `~/Desktop/instagram_archive/images/Референсы` и `~/Desktop/instagram_archive/archive_index.json`. Их можно изменить аргументами `--output` и `--index`; `local_path` записывается относительно папки индекса. Категория настраивается через `--category`. Расширение соответствует фактическому типу ответа (`.jpg`, `.png`, `.webp` и т. п.), чтобы не выдавать PNG за JPEG. Повторные блоки и уже существующие файлы пропускаются; исходный архив не перезаписывается. Для проверки: `python3 -m unittest discover -s tests`.
+
+**Ограничение:** запрошенный API v2 [помечен Are.na как устаревший](https://dev.are.na/documentation); его доступность может измениться. Проверяйте статус и права доступа, если API возвращает ошибку. Этот скрипт не проверяет авторство и лицензии и не помечает материалы как изученные полностью.
