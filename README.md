@@ -2,16 +2,41 @@
 
 ![Visual Reference Workflow](assets/visual-reference-workflow-cover-final.png)
 
-Автоматизированный пайплайн для сбора, селекции и каталогизации дизайн-референсов. Связывает кураторский отбор в Instagram, Are.na и Pinterest, структурированную базу знаний в Notion и процедурную генерацию мудбордов в Figma.
+Автоматизированный пайплайн и автономное настольное веб-приложение для сбора, селекции и каталогизации дизайн-референсов. Связывает кураторский отбор в Instagram, Are.na и Pinterest, локальное интерактивное приложение (**Visual Reference App**), структурированную базу знаний в Notion и процедурную генерацию мудбордов в Figma.
 
 ---
 
-## Контекст и проблема
+## Скачать приложение (Download App)
 
-В работе над визуальным стилем (музыкальная графика, fashion-эдиториал, сценография, типографика) ключевую роль играет качество и систематизация референсов. Стандартный ручной процесс имеет три проблемы:
-1. **Потеря качества:** скриншоты с экрана сжимают изображение и искажают детализацию.
-2. **Утрата контекста:** в сохранённых постах теряется авторство (путаница между автором работы и аккаунтом-репостером) и конкретные приёмы.
-3. **Рутина в Figma:** перетаскивание десятков картинок вручную отнимает часы и превращает доску в неструктурированный хаос.
+Вы можете скачать готовое приложение со страницы **[GitHub Releases](https://github.com/therealfullmetal55555/visual-reference-pipeline/releases/latest)**:
+
+* **[Visual-Reference-App-macOS.dmg](https://github.com/therealfullmetal55555/visual-reference-pipeline/releases/latest)** — нативный установщик для macOS (перетащите приложение в *Программы* / *Applications* и запускайте в один клик).
+* **[Visual-Reference-App-macOS.zip](https://github.com/therealfullmetal55555/visual-reference-pipeline/releases/latest)** — готовый бандл `.app` с встроенным автозапуском и поддержкой Retina.
+* **[Visual-Reference-App-Portable.zip](https://github.com/therealfullmetal55555/visual-reference-pipeline/releases/latest)** — портативная версия с однофайловыми лаунчерами `run.sh` (macOS/Linux) и `run.bat` (Windows).
+
+---
+
+## Возможности приложения (Visual Reference App)
+
+1. **Медиатека и потоковый стриминг:**
+   * Поддержка изображений, видео (MP4, WebM, MOV, OGV) и аудио (MP3) размером до 512 МБ.
+   * Плавная перемотка и потоковое воспроизведение благодаря реализации HTTP 206 Range requests в локальном сервере.
+   * Встроенные нативные плееры прямо внутри карточки просмотра.
+2. **Интерактивная доска (Board):**
+   * Размещение и свободная компоновка референсов на бесконечном холсте.
+   * Неразрушающая коррекция (яркость, контраст, насыщенность, зерно, сепия, размытие, ч/б, кадрирование с 4 сторон).
+   * Сохранение расстановки холста в локальную базу SQLite (`references.sqlite3`).
+3. **Студия коллажей (Collage):**
+   * Сетки от 1×1 до 6×6, готовые пресеты, Drag-and-Drop между слотами и экспорт в чистый PNG.
+4. **Встроенный фоторедактор (Editor):**
+   * Кадрирование, отражение, поворот на 90°.
+   * Наложение текстовых надписей с акцидентными шрифтами (*Instrument Serif*, *Nighthawk*, *Westernic*, *Inter*).
+   * Неограниченная история изменений Undo/Redo (`⌘+Z` / `⌘+Shift+Z`).
+5. **Организация и персонализация:**
+   * Создание локальных тематических папок без дублирования файлов на диске.
+   * Тёмная и светлая темы, двуязычный интерфейс (RU / EN).
+
+---
 
 ## Архитектура решения
 
@@ -23,15 +48,16 @@
                   ▼  (Python Scrapers / CDN Upscalers)
 [ Local High-Res Archive ] ──► archive_index.json (158 единиц)
                   │
+                  ├──► [ Visual Reference App ] (Интерактивная доска, плееры, редактор)
+                  │
                   ├──► [ Notion Database API ] (158 карточек, теги, фактологические заметки)
                   │
-                  └──► [ Figma Canvas / Local Web App ] (3-колоночная сетка, холст 8765)
+                  └──► [ Figma Canvas Engine ] (3-колоночная модульная сетка 2000×1650)
 ```
 
 ### 1. Кураторский отбор и мультиисточниковый сбор (Human-in-the-loop)
 Человек определяет пул целевых профилей и кураторских каналов со специфической визуальной культурой (дизайн-исследования, сценография, типографика, концептуальная мода) и отбирает публикации под текущие задачи.
 
-В систему заложена мультиисточниковая архитектура:
 * **Instagram:** динамичный субкультурный контент, стрит-культура, сценография и бэкстейдж через извлечение чистых CDN-медиа без сжатия (`scripts/harvester.py`).
 * **Are.na API:** прямая интеграция с исследовательской платформой Are.na для выгрузки несжатых сканов, редкой типографики и концептуальных арт-досок в оригинальном разрешении (`scripts/arena_harvester.py`).
 * **Pinterest Harvester:** автоматическое извлечение сохранённых пинов и RSS-лент с автоматическим CDN-апскейлом превью (`236x`/`736x` → `1200x`) в несжатый high-res (`scripts/pinterest_harvester.py`).
@@ -40,7 +66,7 @@
 * Скачивание исходных медиа в оригинальном разрешении без экранного сжатия.
 * Формирование нормализованного локального архива (`images/Референсы/`).
 * Генерация индексного манифеста `archive_index.json` со статусами и метаданными.
-* Мгновенная доступность для локального веб-приложения (`reference_app` на порту 8765).
+* Мгновенная доступность для локального приложения `reference_app`.
 
 ### 3. База знаний и разбор приёмов (Notion API)
 * Автоматическое создание карточек через Notion REST API.
@@ -60,7 +86,7 @@
 
 ## Текущие результаты
 
-* **158 проверенных референсов (120 Instagram + 14 Are.na + 24 Pinterest)** синхронизированы между локальным хранилищем, базой Notion, локальным веб-приложением и файлом Figma.
+* **158 проверенных референсов (120 Instagram + 14 Are.na + 24 Pinterest)** синхронизированы между локальным хранилищем, приложением, базой Notion и файлом Figma.
 * Время подготовки чистового презентационного мудборда сокращено с нескольких часов до **5 секунд**.
 * Исключены пустые AI-галлюцинации и потеря ссылок на реальных авторов.
 
@@ -74,9 +100,9 @@
 
 ## Стек технологий
 
-* **Языки:** Python 3, JavaScript (ES6+ / Figma Plugin API).
+* **Языки:** Python 3 (zero-dependency HTTP/SQLite server), JavaScript (ES6+ / Canvas API / Figma Plugin API).
 * **Интеграции:** Notion REST API, Figma API, Chrome DevTools MCP, Are.na API, Pinterest CDN Engine.
-* **Хранилище:** Локальный JSON-индекс, SQLite базы приложения, реляционная база Notion.
+* **Упаковка:** macOS .app bundle, Apple DMG (hdiutil), GitHub Actions CI/CD.
 
 ---
 
@@ -89,12 +115,22 @@ visual-reference-pipeline/
 │   ├── visual-reference-workflow-cover-final.png  # Обложка репозитория с типографикой
 │   ├── visual-reference-workflow-collage.png      # Коллаж визуальных материалов #1
 │   └── visual-reference-workflow-collage-3.png    # Коллаж визуальных материалов #2
+├── reference_app/              # Локальное веб-приложение
+│   ├── server.py               # HTTP/SQLite сервер с поддержкой Range-стриминга
+│   ├── index.html              # Разметка интерактивного интерфейса
+│   ├── style.css               # Стилистика (тёмная/светлая темы, канвас)
+│   ├── app.js                  # Каталог, аудиоплеер, видеоплеер, теги
+│   ├── board.js                # Интерактивная доска, зум, обрезка, фильтры
+│   ├── studio.js               # Коллажирование и отдельный фоторедактор
+│   ├── workspace.js            # Папки, темы, переключение языка RU/EN
+│   └── fonts/                  # Акцидентные шрифты для оверлеев
 ├── scripts/
 │   ├── harvester.py            # Извлечение оригинальных медиа из Instagram
 │   ├── arena_harvester.py      # Are.na API → локальный архив
 │   ├── pinterest_harvester.py  # Pinterest (RSS / JSON / CDN 1200px) → архив
 │   ├── sync_notion.py          # Синхронизация манифеста с базой Notion API
-│   └── figma_layout.js         # Модульная авто-верстка сетки для Figma
+│   ├── figma_layout.js         # Модульная авто-верстка сетки для Figma
+│   └── package_app.py          # Автоматическая сборка macOS .app, DMG и Portable ZIP
 ├── tests/
 │   ├── test_arena_harvester.py     # Unit-тесты для Are.na сборщика
 │   └── test_pinterest_harvester.py # Unit-тесты для Pinterest сборщика
@@ -106,52 +142,42 @@ visual-reference-pipeline/
 
 ## Быстрый запуск
 
-### 1. Установка зависимостей
+### 1. Запуск приложения из исходников
 ```bash
-pip install -r requirements.txt
+python3 reference_app/server.py
 ```
+После запуска откройте в браузере: **`http://127.0.0.1:8765`**
 
-### 2. Запуск сборщика референсов (Instagram)
+### 2. Сборка настольного приложения (macOS .app / DMG)
 ```bash
+python3 scripts/package_app.py
+```
+Готовые сборки сохраняются в папку `dist/`.
+
+### 3. Сборщики референсов
+```bash
+# Instagram
 python scripts/harvester.py --output ~/Desktop/instagram_archive/images/Референсы
-```
 
-### 3. Сборщик Are.na → локальный архив
-```bash
+# Are.na
 python3 scripts/arena_harvester.py --channel minimal-typography
-```
 
-Для закрытого канала передайте токен через окружение:
-```bash
-read -rs "ARENA_API_TOKEN?Токен Are.na: "
-export ARENA_API_TOKEN
-python3 scripts/arena_harvester.py --channel minimal-typography
-unset ARENA_API_TOKEN
-```
-
-### 4. Сборщик Pinterest → локальный архив
-Запуск с открытой RSS-ленты доски:
-```bash
+# Pinterest (из RSS или JSON)
 python3 scripts/pinterest_harvester.py --rss "https://www.pinterest.com/username/board.rss"
 ```
 
-Или импорт структурированных пинов из сессии:
-```bash
-python3 scripts/pinterest_harvester.py --pins-json path/to/pins.json
-```
-
-### 5. Запуск тестов
+### 4. Запуск тестов
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-### 6. Синхронизация с Notion
+### 5. Синхронизация с Notion
 ```bash
 export NOTION_API_KEY="your-secret-key"
 python scripts/sync_notion.py --database-id "your-database-id"
 ```
 
-### 7. Генерация раскладки в Figma
+### 6. Генерация раскладки в Figma
 1. Откройте Figma Desktop с целевым файлом.
 2. Нажмите **`⌥ + ⌘ + I`** (Option + Command + I) для открытия консоли.
 3. Вставьте содержимое [`scripts/figma_layout.js`](scripts/figma_layout.js) и нажмите **Enter**.

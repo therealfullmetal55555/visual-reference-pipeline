@@ -9,6 +9,16 @@ venv/
 ENV/
 .env
 
+# Application Builds
+dist/
+build/
+*.dmg
+
+# Application Database & User Uploads
+reference_app/references.sqlite3*
+reference_app/uploads/*
+!reference_app/uploads/.gitkeep
+
 # Media & Archives (kept local, not committed to public git)
 images/
 downloads/
