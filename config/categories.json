@@ -1,0 +1,58 @@
+{
+  "canvas": {
+    "frameWidth": 2000,
+    "frameHeight": 1650,
+    "backgroundColor": {
+      "r": 0.055,
+      "g": 0.055,
+      "b": 0.055
+    },
+    "grid": {
+      "columns": 3,
+      "startX": 80,
+      "startY": 160,
+      "cardWidth": 560,
+      "cardMaxHeight": 500,
+      "gapX": 60,
+      "gapY": 80
+    }
+  },
+  "sections": [
+    {
+      "name": "FASHION И ТЕЛЕСНАЯ ДРАМАТУРГИЯ",
+      "prefixes": ["[Fashion]"],
+      "x": 7840,
+      "y": 0
+    },
+    {
+      "name": "VVUTURA, CARTI BILLBOARD И ОБЪЕКТЫ",
+      "prefixes": ["[Editorial]", "[Biomechanics]", "[Object]"],
+      "x": 9940,
+      "y": 0
+    },
+    {
+      "name": "ГРАФИЧЕСКИЙ ЗНАК, МЕРЧ И ПРИНТ",
+      "prefixes": ["[Graphic]", "[Typography]"],
+      "x": 12040,
+      "y": 0
+    },
+    {
+      "name": "АНАТОМИЧЕСКАЯ КАЛЛИГРАФИЯ И ТАТУ",
+      "prefixes": ["[Lettering]"],
+      "x": 14140,
+      "y": 0
+    },
+    {
+      "name": "СЦЕНОГРАФИЯ И СВЕТОВАЯ АРХИТЕКТУРА",
+      "prefixes": ["[Stage]"],
+      "x": 16240,
+      "y": 0
+    },
+    {
+      "name": "ЛИЧНОЕ ПРИСУТСТВИЕ, VHS И ВИДЕОКАДР",
+      "prefixes": ["[Presence]", "[Document]", "[Video Still]"],
+      "x": 18340,
+      "y": 0
+    }
+  ]
+}
