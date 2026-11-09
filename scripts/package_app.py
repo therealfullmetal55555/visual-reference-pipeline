@@ -57,6 +57,13 @@ def build_macos_app():
         shutil.rmtree(DIST)
     DIST.mkdir(parents=True, exist_ok=True)
 
+    # Ensure official icons are generated
+    icns_src = APP_SRC / "AppIcon.icns"
+    if not icns_src.exists():
+        icon_gen = ROOT / "scripts" / "generate_icons.py"
+        if icon_gen.exists():
+            subprocess.run([sys.executable, str(icon_gen)], check=True)
+
     app_bundle = DIST / "Visual Reference App.app"
     contents = app_bundle / "Contents"
     macos = contents / "MacOS"
@@ -79,11 +86,11 @@ def build_macos_app():
         else:
             shutil.copy2(item, app_dir / item.name)
 
-    # Generate and copy icon
+    # Copy official macOS icon
     icns_path = resources / "AppIcon.icns"
-    logo_path = APP_SRC / "logo-concept.png"
-    if logo_path.exists() and shutil.which("sips") and shutil.which("iconutil"):
-        build_icon(logo_path, icns_path)
+    if icns_src.exists():
+        shutil.copy2(icns_src, icns_path)
+        print(f"[✓] Installed official macOS icon: {icns_path.name}")
 
     # Info.plist
     info_plist = """<?xml version="1.0" encoding="UTF-8"?>
@@ -168,6 +175,13 @@ wait "$SERVER_PID"
         staging.mkdir(parents=True)
         shutil.copytree(app_bundle, staging / "Visual Reference App.app", symlinks=True)
         os.symlink("/Applications", staging / "Applications")
+
+        # DMG volume icon
+        vol_icon = staging / ".VolumeIcon.icns"
+        if icns_path.exists():
+            shutil.copy2(icns_path, vol_icon)
+            if shutil.which("SetFile"):
+                subprocess.run(["SetFile", "-a", "C", str(staging)], check=False)
 
         dmg_path = DIST / "Visual-Reference-App-macOS.dmg"
         subprocess.run(
