@@ -65,6 +65,11 @@
 
 ![Карточка референса и плеер](assets/ui-media-modal.png)
 
+### 6. Панель настроек и системный промпт для ИИ-агента
+Встроенная инструкция со всеми коннекторами (Notion DB, Notion Doc, Figma, GitHub, Brand Standards), переключением языков RU/EN и мгновенным копированием в буфер обмена для передачи агенту в Antigravity, Claude или ChatGPT.
+
+![Панель настроек и системный промпт для ИИ](assets/ui-settings-agent-prompt.png)
+
 ---
 
 ## Архитектура решения
@@ -148,7 +153,8 @@ visual-reference-pipeline/
 │   ├── ui-board-canvas.png                        # Скриншот: Интерактивная доска
 │   ├── ui-collage-studio.png                      # Скриншот: Студия коллажей
 │   ├── ui-editor-typography.png                   # Скриншот: Фоторедактор с типографикой
-│   └── ui-media-modal.png                         # Скриншот: Медиаплеер и карточка
+│   ├── ui-media-modal.png                         # Скриншот: Медиаплеер и карточка
+│   └── ui-settings-agent-prompt.png               # Скриншот: Настройки и системный промпт ИИ
 ├── reference_app/              # Локальное веб-приложение
 │   ├── server.py               # HTTP/SQLite сервер с поддержкой Range-стриминга
 │   ├── index.html              # Разметка интерактивного интерфейса
