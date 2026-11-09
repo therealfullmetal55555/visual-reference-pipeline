@@ -1,6 +1,8 @@
 # Visual Reference Pipeline: Instagram → Notion → Figma
 
-Автоматизированный пайплайн для сбора, селекции и каталогизации дизайн-референсов. Связывает кураторский отбор в Instagram, структурированную базу знаний в Notion и процедурную генерацию мудбордов в Figma.
+![Visual Reference Workflow](assets/visual-reference-workflow-cover-final.png)
+
+Автоматизированный пайплайн для сбора, селекции и каталогизации дизайн-референсов. Связывает кураторский отбор в Instagram и Are.na, структурированную базу знаний в Notion и процедурную генерацию мудбордов в Figma.
 
 ---
 
@@ -16,18 +18,18 @@
 Пайплайн объединяет кураторский вкус человека и автоматизацию рутинных операций:
 
 ```text
-[ Instagram Curated Accounts ]
-             │
-             ▼  (Python Scraper / Embed Harvester)
+[ Instagram & Are.na Curated Channels ]
+                  │
+                  ▼  (Python Scrapers / Embed Harvesters)
 [ Local High-Res Archive ] ──► archive_index.json
-             │
-             ├──► [ Notion Database API ] (120+ карточек, теги, фактологические заметки)
-             │
-             └──► [ Figma Canvas ] (Asset Upload + JS/Plugin API генерация 3-колоночной сетки)
+                  │
+                  ├──► [ Notion Database API ] (134 карточки, теги, фактологические заметки)
+                  │
+                  └──► [ Figma Canvas ] (Asset Upload + JS/Plugin API генерация 3-колоночной сетки)
 ```
 
 ### 1. Кураторский отбор (Human-in-the-loop)
-Человек определяет пул целевых аккаунтов со специфической визуальной культурой (`@mister_dove`, `Tom Schneider / VVUTURA`, `@indiana420bitch`, `@crutch.tattoos`, `@_artdealer_` и др.) и отбирает публикации под текущие задачи.
+Человек определяет пул целевых аккаунтов и каналов со специфической визуальной культурой (`@mister_dove`, `Tom Schneider / VVUTURA`, `@indiana420bitch`, `@crutch.tattoos`, `@_artdealer_`, кураторские каналы Are.na) и отбирает публикации под текущие задачи.
 
 ### 2. Извлечение и локальный архив (Python)
 * Скачивание исходных медиа в оригинальном разрешении без экранного сжатия.
@@ -69,10 +71,18 @@
 * Время подготовки чистового презентационного мудборда сокращено с нескольких часов до **5 секунд**.
 * Исключены пустые AI-галлюцинации и потеря ссылок на реальных авторов.
 
+### Визуальные материалы и карта референсов
+
+![Visual Reference Collage 1](assets/visual-reference-workflow-collage.png)
+
+![Visual Reference Collage 2](assets/visual-reference-workflow-collage-3.png)
+
+---
+
 ## Стек технологий
 
 * **Языки:** Python 3, JavaScript (ES6+ / Figma Plugin API).
-* **Интеграции:** Notion REST API, Figma API, Chrome DevTools.
+* **Интеграции:** Notion REST API, Figma API, Chrome DevTools, Are.na API.
 * **Хранилище:** Локальный JSON-индекс, реляционная база Notion.
 
 ---
@@ -82,8 +92,12 @@
 ```text
 visual-reference-pipeline/
 ├── README.md
+├── assets/
+│   ├── visual-reference-workflow-cover-final.png  # Обложка репозитория с типографикой
+│   ├── visual-reference-workflow-collage.png      # Коллаж визуальных материалов #1
+│   └── visual-reference-workflow-collage-3.png    # Коллаж визуальных материалов #2
 ├── scripts/
-│   ├── harvester.py          # Извлечение оригинальных медиа и ведение каталога
+│   ├── harvester.py          # Извлечение оригинальных медиа из Instagram
 │   ├── arena_harvester.py    # Are.na → локальный архив
 │   ├── sync_notion.py        # Синхронизация манифеста с базой Notion API
 │   └── figma_layout.js       # Модульная авто-верстка сетки для Figma
@@ -100,45 +114,31 @@ visual-reference-pipeline/
 pip install -r requirements.txt
 ```
 
-### 2. Запуск сборщика референсов
+### 2. Запуск сборщика референсов (Instagram)
 ```bash
 python scripts/harvester.py --output ~/Desktop/instagram_archive/images/Референсы
 ```
 
-### 3. Синхронизация с Notion
+### 3. Сборщик Are.na → локальный архив
+```bash
+python3 scripts/arena_harvester.py --channel minimal-typography
+```
+
+Для закрытого канала передайте токен через окружение:
+```bash
+read -rs "ARENA_API_TOKEN?Токен Are.na: "
+export ARENA_API_TOKEN
+python3 scripts/arena_harvester.py --channel minimal-typography
+unset ARENA_API_TOKEN
+```
+
+### 4. Синхронизация с Notion
 ```bash
 export NOTION_API_KEY="your-secret-key"
 python scripts/sync_notion.py --database-id "your-database-id"
 ```
 
-### 4. Генерация раскладки в Figma
+### 5. Генерация раскладки в Figma
 1. Откройте Figma Desktop с целевым файлом.
 2. Нажмите **`⌥ + ⌘ + I`** (Option + Command + I) для открытия консоли.
 3. Вставьте содержимое [`scripts/figma_layout.js`](scripts/figma_layout.js) и нажмите **Enter**.
-
-
-## Are.na → локальный архив
-
-Для запуска нужен Python 3; дополнительных пакетов для этого сборщика не требуется. Скрипт читает канал Are.na через API v2, сохраняет исходные изображения из `image.original.url` и добавляет записи в существующий JSON-индекс. Он не запускает синхронизацию с Notion и не публикует материалы в Figma. Убедитесь, что у вас есть право сохранить и использовать выбранные материалы.
-
-1. Откройте канал. В адресе `https://www.are.na/username/minimal-typography` его slug — `minimal-typography` (последняя часть адреса).
-2. Для публичного канала токен не нужен:
-
-   ```bash
-   python3 scripts/arena_harvester.py --channel minimal-typography
-   ```
-
-3. Для закрытого канала, доступного вашему аккаунту, войдите в Are.na и создайте персональный токен на [странице токенов](https://www.are.na/developers/personal-access-tokens), выбрав доступ на чтение. Передайте его через окружение и не добавляйте в репозиторий:
-
-   ```bash
-   read -rs "ARENA_API_TOKEN?Токен Are.na: "  # zsh, ввод не отображается
-   export ARENA_API_TOKEN
-   python3 scripts/arena_harvester.py --channel minimal-typography
-   unset ARENA_API_TOKEN
-   ```
-
-   Альтернатива — `--token TOKEN`, но аргументы могут сохраняться в истории команд и отображаться в списке процессов. Токен используется только для запроса к API, а не при скачивании изображений.
-
-Пути по умолчанию: `~/Desktop/instagram_archive/images/Референсы` и `~/Desktop/instagram_archive/archive_index.json`. Их можно изменить аргументами `--output` и `--index`; `local_path` записывается относительно папки индекса. Категория настраивается через `--category`. Расширение соответствует фактическому типу ответа (`.jpg`, `.png`, `.webp` и т. п.), чтобы не выдавать PNG за JPEG. Повторные блоки и уже существующие файлы пропускаются; исходный архив не перезаписывается. Для проверки: `python3 -m unittest discover -s tests`.
-
-**Ограничение:** запрошенный API v2 [помечен Are.na как устаревший](https://dev.are.na/documentation); его доступность может измениться. Проверяйте статус и права доступа, если API возвращает ошибку. Этот скрипт не проверяет авторство и лицензии и не помечает материалы как изученные полностью.

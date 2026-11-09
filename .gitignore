@@ -10,16 +10,18 @@ ENV/
 .env
 
 # Media & Archives (kept local, not committed to public git)
-*.jpg
-*.jpeg
-*.png
-*.webp
-*.mp4
-*.zip
-*.tar.gz
 images/
 downloads/
 archive/
+_system/
+*.zip
+*.tar.gz
+
+# Allow documentation assets
+!assets/
+!assets/*
+!docs/
+!docs/*
 
 # OS Specific
 .DS_Store
