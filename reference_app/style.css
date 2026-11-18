@@ -291,3 +291,39 @@ html[data-theme=light] .make-workspace {
 @media (prefers-reduced-motion: reduce) {
   .archive-grid .media img { transition: none; }
 }
+
+.archive-selection {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+#toggleSelection[aria-pressed=true] { outline: 1px solid var(--muted); }
+#sendToBoard:disabled, #boardExport:disabled, #boardSources:disabled { opacity: .45; cursor: default; }
+.archive-grid.selecting .card .media::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-content: center;
+  color: #111;
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 55%);
+}
+.archive-grid.selecting .card[aria-pressed=true] .media::after {
+  content: "✓";
+  border-color: #eee;
+  background: #eee;
+}
+.archive-grid .card[aria-pressed=true] { outline: 1px solid #aaa; outline-offset: 2px; }
+#selectionStatus, #pickerStatus, #boardFeedback { color: var(--muted); }
+#boardFeedback:not(:empty) { margin-left: 8px; font-size: 11px; }
+.board-actions { flex-wrap: wrap; }
+#quickPreview { width: max-content; max-width: min(94vw, 1150px); padding: 12px; }
+.quick-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+#quickPreviewMedia img, #quickPreviewMedia video { display: block; max-width: 100%; max-height: 78vh; object-fit: contain; }
