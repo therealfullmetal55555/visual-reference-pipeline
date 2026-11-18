@@ -5,6 +5,22 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent
 DB=ROOT/'references.sqlite3'
+configured_archive=os.environ.get('REFERENCE_ARCHIVE_DIR')
+ARCHIVE_ROOTS=(Path(configured_archive).expanduser().resolve(),) if configured_archive else (
+ ROOT.parent, ROOT, Path.home()/'Desktop'/'instagram_archive'
+)
+
+def archive_image(relative_path):
+ relative_path=Path(relative_path)
+ if relative_path.is_absolute() or relative_path.parts[:1]!=('images',):
+  return None
+ for archive_root in ARCHIVE_ROOTS:
+  images=(archive_root/'images').resolve()
+  image=(archive_root/relative_path).resolve()
+  if image.is_relative_to(images) and image.is_file():
+   return image
+ return None
+
 FIELDS=['title','url','author','type','preview','description','hook','composition','light','color','typography','texture','editing','camera','tags','ideas','added']
 def db():
  c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
@@ -54,20 +70,17 @@ class Handler(BaseHTTPRequestHandler):
    self.js(200,json.loads(row['data']) if row else []); return
   if path=='/api/archive':
    records=[]
-   archive_dir=None
-   for cand in (ROOT.parent/'archive_index.json', ROOT/'archive_index.json', Path.home()/'Desktop'/'instagram_archive'/'archive_index.json'):
-    if cand.is_file():
-     try:
-      with cand.open(encoding='utf-8') as f: records=json.load(f)
-      archive_dir=cand.parent; break
-     except Exception: pass
+   for archive_root in ARCHIVE_ROOTS:
+    try:
+     with (archive_root/'archive_index.json').open(encoding='utf-8') as f: index=json.load(f)
+    except (OSError, ValueError): continue
+    if isinstance(index,list):
+     records=index; break
    result=[]
    for i, r in enumerate(records):
+    if not isinstance(r,dict): continue
     rel=r.get('relative_path') or r.get('local_path') or ''
-    found=False
-    for base in ([archive_dir] if archive_dir else []) + [ROOT.parent, ROOT, Path.home()/'Desktop'/'instagram_archive']:
-     if base and (base/rel).is_file(): found=True; break
-    if not rel.startswith('images/') or not found: continue
+    if not isinstance(rel,str) or archive_image(rel) is None: continue
     result.append({'id':'archive:'+str(i),'title':r.get('title') or r.get('file') or 'Без названия','url':r.get('canonical_url') or r.get('source_url') or r.get('instagram_url') or '', 'author':r.get('author') or '', 'type':'Фото','preview':'/archive/'+rel,'description':r.get('summary') or r.get('observation') or '', 'hook':'','composition':'','light':'','color':'','typography':'','texture':'','editing':'','camera':'','tags':', '.join(r.get('tags') or []),'ideas':'','added':'','archived':True})
    self.js(200,result); return
   if path=='/api/references':
@@ -83,10 +96,9 @@ class Handler(BaseHTTPRequestHandler):
    if f.is_relative_to(ROOT/'fonts') and f.is_file(): self.send(200,f.read_bytes(),mimetypes.guess_type(f.name)[0] or 'application/octet-stream'); return
   if path.startswith('/archive/'):
    rel=unquote(path[len('/archive/'):])
-   for base in (ROOT.parent, ROOT, Path.home()/'Desktop'/'instagram_archive'):
-    b=base.resolve(); f=(b/rel).resolve()
-    if (f.is_relative_to(b/'images') or f.is_relative_to(b)) and f.is_file():
-     self.send(200,f.read_bytes(),mimetypes.guess_type(f.name)[0] or 'application/octet-stream'); return
+   f=archive_image(rel)
+   if f:
+    self.send(200,f.read_bytes(),mimetypes.guess_type(f.name)[0] or 'application/octet-stream'); return
    return self.js(404,{'error':'Не найдено'})
   self.js(404,{'error':'Не найдено'})
  def body(self):
