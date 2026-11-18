@@ -3,10 +3,14 @@ let mediaFilter="", reverseOrder=false;
 const selectedReferences=new Set();
 const selectionButton=$('#toggleSelection'), boardButton=$('#sendToBoard'), selectionStatus=$('#selectionStatus');
 let selectionMode=false, sendingSelection=false, selectionAnchor=null;
+window.workflowReferences=()=>[...refs,...archive];
+window.workflowSelection=()=>window.workflowReferences().filter(item=>selectedReferences.has(item.id));
+window.refreshReferences=load;
+window.openReferenceCard=open;
 const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tags=s=>String(s||'').split(',').map(x=>x.trim()).filter(Boolean);
 function media(r){let p=r.preview||''; if(r.type==='Аудио')return '<div class="audio-card"><span aria-hidden="true">♪</span><small>MP3</small></div>';  if(!/^(https?:\/\/|\/archive\/|\/media\/)/i.test(p)) return '<div class="placeholder"><span>↗</span><small>БЕЗ ПРЕВЬЮ</small></div>'; let src=esc(p); return r.type==='Видео'&&/\.(mp4|webm|mov|ogv|ogg)([?#]|$)/i.test(p)?`<video src="${src}" muted playsinline preload="metadata"></video>`:`<img src="${src}" loading="lazy" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><div class="placeholder" hidden><span>↗</span><small>ПРЕВЬЮ НЕДОСТУПНО</small></div>`}
-async function load(){let res=await fetch('/api/references'); if(!res.ok) throw Error('Не удалось загрузить коллекцию'); refs=await res.json(); let a=await fetch('/api/archive'); if(a.ok) archive=await a.json(); if(!initialized){initialized=true;switchView('archive')}else render()}
+async function load(){let res=await fetch('/api/references'); if(!res.ok) throw Error('Не удалось загрузить коллекцию'); refs=await res.json(); let a=await fetch('/api/archive'); if(a.ok) archive=await a.json(); if(!initialized){initialized=true;switchView('archive')}else render();window.workflowArchiveUpdated?.()}
 function archiveItems(){
   const items=[...refs,...archive];
   if(view==='archive') return items;
@@ -125,6 +129,12 @@ boardButton.onclick=async()=>{
 };
 
 const quickPreview=$('#quickPreview'), quickMedia=$('#quickPreviewMedia');
+let previewReference=null;
+$('#quickPreviewWorkflow').onclick=()=>{
+  if(!previewReference) return;
+  quickPreview.close();
+  window.openWorkflow(previewReference.type==='Видео'?'timeline':'search',previewReference);
+};
 $('#closeQuickPreview').onclick=()=>quickPreview.close();
 quickPreview.addEventListener('close',()=>quickMedia.replaceChildren());
 grid.addEventListener('keydown',event=>{
@@ -143,13 +153,15 @@ grid.addEventListener('keydown',event=>{
   preview.onerror=()=>{
     quickMedia.textContent=localStorage.getItem('vrw-language')==='en'?'Preview unavailable':'Превью недоступно';
   };
+  previewReference=ref;
+  $('#quickPreviewWorkflow').textContent=ref.type==='Видео'?'Разобрать видео':'Найти похожие';
   $('#quickPreviewTitle').textContent=ref.title;
   quickMedia.replaceChildren(preview);
   quickPreview.showModal();
 });
 
 document.addEventListener('keydown',event=>{
-  if(event.key!=='Escape'||!selectionMode||sendingSelection||$('#libraryPanel').hidden||dialog.open||quickPreview.open) return;
+  if(event.key!=='Escape'||!selectionMode||sendingSelection||$('#libraryPanel').hidden||dialog.open||quickPreview.open||$('#workflowDialog').open) return;
   clearSelection();
   updateReferenceSelection();
 });

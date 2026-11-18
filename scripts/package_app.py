@@ -75,7 +75,7 @@ def build_macos_app():
 
     # Copy reference_app files
     for item in APP_SRC.iterdir():
-        if item.name in [".git", "__pycache__", "references.sqlite3", "references.sqlite3-wal", "references.sqlite3-shm"]:
+        if item.name in [".git", "__pycache__", "uploads", "references.sqlite3", "references.sqlite3-wal", "references.sqlite3-shm"]:
             continue
         if item.is_dir():
             shutil.copytree(
@@ -205,7 +205,7 @@ wait "$SERVER_PID"
     if portable.exists():
         shutil.rmtree(portable)
     portable.mkdir(parents=True)
-    shutil.copytree(APP_SRC, portable / "app", ignore=shutil.ignore_patterns("__pycache__", "*.sqlite3*", "*.mp3", "*.mp4"))
+    shutil.copytree(APP_SRC, portable / "app", ignore=shutil.ignore_patterns("__pycache__", "uploads", "*.sqlite3*", "*.mp3", "*.mp4"))
 
     run_sh = """#!/bin/bash
 cd "$(dirname "$0")/app" || exit 1

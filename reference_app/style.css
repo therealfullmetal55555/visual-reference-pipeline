@@ -327,3 +327,84 @@ html[data-theme=light] .make-workspace {
 #quickPreview { width: max-content; max-width: min(94vw, 1150px); padding: 12px; }
 .quick-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
 #quickPreviewMedia img, #quickPreviewMedia video { display: block; max-width: 100%; max-height: 78vh; object-fit: contain; }
+
+#workflowDialog {
+  width: min(1120px, 95vw);
+  max-width: 95vw;
+  max-height: 90dvh;
+  padding: 20px 24px;
+}
+.workflow-header,
+.workflow-tabs,
+.workflow-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.workflow-header { justify-content: space-between; margin-bottom: 12px; }
+.workflow-header h2 { font-size: 17px; margin: 0; }
+.workflow-tabs { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 12px; }
+#workflowDialog [hidden] { display: none !important; }
+#workflowDialog button[aria-pressed=true] { outline: 1px solid var(--muted); }
+#workflowDialog button:disabled { opacity: .5; }
+#workflowDialog form { padding: 0; }
+#workflowDialog label { display: inline-flex; align-items: center; gap: 6px; }
+#workflowDialog label.workflow-field { display: grid; align-items: stretch; margin: 12px 0; }
+#workflowDialog select,
+#workflowDialog textarea,
+#workflowDialog input:not([type=checkbox]):not([type=range]):not([type=file]) {
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 6px 8px;
+}
+#workflowDialog select { width: min(230px, 48vw); }
+#workflowDialog input[type=number] { width: 7.5ch; }
+#workflowDialog textarea { resize: vertical; }
+#workflowDialog input[type=range] { max-width: 110px; }
+#workflowDialog a { color: var(--text); text-decoration-color: var(--muted); }
+.workflow-controls > label.workflow-grow { flex: 1 1 280px; }
+.workflow-grow input { width: 100%; }
+#workflowStatus { margin: 8px 0; color: var(--muted); }
+#workflowStatus.workflow-error { color: #d48d83; }
+#workflowDialog .workflow-list { display: grid; gap: 8px; padding: 0; list-style: none; margin: 12px 0; }
+.workflow-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0;
+}
+.shot-fields { flex: 1; min-width: 150px; display: grid; gap: 4px; }
+.shot-fields p, #savedReviews p, #reviewEvidence p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.workflow-thumb { width: 70px; height: 55px; object-fit: cover; border-radius: 3px; }
+#workflowPlayer {
+  width: 100%;
+  max-height: 48vh;
+  background: #080808;
+  margin: 10px 0;
+}
+#workflowTime { font-variant-numeric: tabular-nums; min-width: 75px; }
+#comparisonStage { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin: 10px 0; max-width: 920px; }
+#comparisonStage figure { position: relative; isolation: isolate; margin: 0; overflow: hidden; background: #111; aspect-ratio: 4/3; }
+#comparisonStage img { display: block; width: 100%; height: 100%; object-fit: contain; }
+#comparisonStage figcaption { position: absolute; bottom: 8px; left: 8px; background: #080808d8; color: #eee; border-radius: 3px; padding: 2px 5px; }
+#comparisonStage.comparison-overlay { display: grid; grid-template-columns: minmax(0,1fr); max-width: 600px; }
+.comparison-overlay figure { grid-area: 1/1; }
+.comparison-overlay figure:last-child { clip-path: inset(0 calc(100% - var(--wipe,50%)) 0 0); }
+.workflow-results { display: grid; grid-template-columns: repeat(auto-fill,minmax(145px,1fr)); gap: 12px; }
+.workflow-results article { display: grid; gap: 5px; min-width: 0; }
+.workflow-results article img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--bg); }
+.workflow-results strong { overflow-wrap: anywhere; }
+#savedReviews details { padding: 8px 0; border-top: 1px solid var(--line); }
+#savedReviews summary { cursor: pointer; }
+#markerLabel { flex: 1 1 210px; }
+@media(max-width: 730px) {
+  #workflowDialog { padding: 12px; }
+  .archive-actions { flex-wrap: wrap; }
+  .shot-row { flex-wrap: wrap; }
+  .shot-fields { flex-basis: 50%; }
+  #workflowDialog select { max-width: 55vw; }
+}
