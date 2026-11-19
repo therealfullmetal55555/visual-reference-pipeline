@@ -20,7 +20,9 @@ reference_app/uploads/*
 !reference_app/uploads/.gitkeep
 
 # Media & Archives (kept local, not committed to public git)
+images
 images/
+archive_index.json
 downloads/
 archive/
 _system/
