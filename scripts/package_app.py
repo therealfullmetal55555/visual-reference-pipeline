@@ -9,7 +9,11 @@ Builds:
 4. Cross-platform portable bundle with run.sh and run.bat (Visual-Reference-App-Portable.zip)
 """
 
+import argparse
 import os
+import platform
+import plistlib
+import tempfile
 import sys
 import shutil
 import subprocess
@@ -51,122 +55,69 @@ def build_icon(logo_path: Path, output_icns: Path):
     print(f"[✓] Generated macOS icon: {output_icns.name}")
 
 
-def build_macos_app():
-    """Build macOS .app bundle and DMG installer."""
-    if DIST.exists():
-        shutil.rmtree(DIST)
+def build_macos_app(archive=None, previous_workspace=None, app_only=False, sdk_path=None):
+    """Compile the SwiftUI app and package it without user media."""
     DIST.mkdir(parents=True, exist_ok=True)
+    bundle_name = "Visual Reference App.app"
+    app_bundle = DIST / bundle_name
+    plist = {
+        "CFBundleExecutable": "VisualReference",
+        "CFBundleIconFile": "AppIcon",
+        "CFBundleIdentifier": "com.visualreference.app",
+        "CFBundleName": "Visual Reference App",
+        "CFBundleDisplayName": "Visual Reference App",
+        "CFBundlePackageType": "APPL",
+        "CFBundleShortVersionString": "1.1.0",
+        "CFBundleVersion": "2",
+        "LSMinimumSystemVersion": "13.0",
+        "NSHighResolutionCapable": True,
+        "NSDesktopFolderUsageDescription": "Открывает выбранный архив визуальных референсов.",
+        "NSDocumentsFolderUsageDescription": "Открывает выбранные материалы.",
+    }
+    if archive:
+        plist["VRWInitialArchive"] = str(archive.resolve())
+    if previous_workspace:
+        plist["VRWPreviousWorkspace"] = str(previous_workspace.resolve())
 
-    # Ensure official icons are generated
-    icns_src = APP_SRC / "AppIcon.icns"
-    if not icns_src.exists():
-        icon_gen = ROOT / "scripts" / "generate_icons.py"
-        if icon_gen.exists():
-            subprocess.run([sys.executable, str(icon_gen)], check=True)
+    with tempfile.TemporaryDirectory(prefix="native-", dir=DIST) as directory:
+        stage = Path(directory)
+        staged_app = stage / bundle_name
+        contents = staged_app / "Contents"
+        macos = contents / "MacOS"
+        resources = contents / "Resources"
+        app_dir = resources / "app"
+        macos.mkdir(parents=True)
+        app_dir.mkdir(parents=True)
+        for name in ("desktop_bootstrap.py", "server.py", "workflow.py"):
+            shutil.copy2(APP_SRC / name, app_dir / name)
+        icns_src = APP_SRC / "AppIcon.icns"
+        if icns_src.is_file():
+            shutil.copy2(icns_src, resources / "AppIcon.icns")
+        with (contents / "Info.plist").open("wb") as destination:
+            plistlib.dump(plist, destination)
+        sources = sorted((ROOT / "scripts" / "native").glob("*.swift"))
+        cache = stage / "modules"
+        cache.mkdir()
+        build_env = dict(os.environ, CLANG_MODULE_CACHE_PATH=str(cache), SWIFT_MODULE_CACHE_PATH=str(cache))
+        sdk = ["-sdk", str(sdk_path)] if sdk_path else []
+        subprocess.run(["xcrun", "swiftc", *sdk, "-O", "-swift-version", "5", "-parse-as-library",
+                        "-target", f"{platform.machine()}-apple-macosx13.0", "-module-cache-path", str(cache),
+                        *map(str, sources), "-o", str(macos / "VisualReference")], check=True, env=build_env)
+        if shutil.which("codesign"):
+            subprocess.run(["codesign", "--force", "--deep", "-s", "-", str(staged_app)], check=True)
+        zip_app = DIST / "Visual-Reference-App-macOS.zip"
+        zip_staged = stage / zip_app.name
+        subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(staged_app), str(zip_staged)], check=True)
+        if app_bundle.exists():
+            app_bundle.rename(stage / "previous.app")
+        staged_app.rename(app_bundle)
+        zip_staged.replace(zip_app)
+    print(f"Built {app_bundle}")
+    print(f"Built {zip_app}")
+    if app_only:
+        return
 
-    app_bundle = DIST / "Visual Reference App.app"
-    contents = app_bundle / "Contents"
-    macos = contents / "MacOS"
-    resources = contents / "Resources"
-    app_dir = resources / "app"
-
-    macos.mkdir(parents=True, exist_ok=True)
-    app_dir.mkdir(parents=True, exist_ok=True)
-
-    # Copy reference_app files
-    for item in APP_SRC.iterdir():
-        if item.name in [".git", "__pycache__", "uploads", "references.sqlite3", "references.sqlite3-wal", "references.sqlite3-shm"]:
-            continue
-        if item.is_dir():
-            shutil.copytree(
-                item,
-                app_dir / item.name,
-                ignore=shutil.ignore_patterns("__pycache__", "*.sqlite3*", "*.mp3", "*.mp4")
-            )
-        else:
-            shutil.copy2(item, app_dir / item.name)
-
-    # Copy official macOS icon
-    icns_path = resources / "AppIcon.icns"
-    if icns_src.exists():
-        shutil.copy2(icns_src, icns_path)
-        print(f"[✓] Installed official macOS icon: {icns_path.name}")
-
-    # Info.plist
-    info_plist = """<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>launcher</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.visualreference.app</string>
-    <key>CFBundleName</key>
-    <string>Visual Reference App</string>
-    <key>CFBundleDisplayName</key>
-    <string>Visual Reference App</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1.0.0</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>11.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>"""
-    (contents / "Info.plist").write_text(info_plist, encoding="utf-8")
-
-    # Launcher script
-    launcher = """#!/bin/bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-APP_DIR="$DIR/../Resources/app"
-
-cd "$APP_DIR" || exit 1
-
-PORT=8765
-if curl -s -I "http://127.0.0.1:$PORT/" 2>/dev/null | grep -qi "Visual Reference"; then
-    open "http://127.0.0.1:$PORT/"
-    exit 0
-fi
-
-while lsof -i :$PORT >/dev/null 2>&1; do
-    PORT=$((PORT+1))
-done
-
-cleanup() {
-    if [ -n "$SERVER_PID" ]; then
-        kill "$SERVER_PID" 2>/dev/null
-    fi
-    exit 0
-}
-trap cleanup SIGINT SIGTERM EXIT
-
-PORT=$PORT python3 server.py >/dev/null 2>&1 &
-SERVER_PID=$!
-
-for i in {1..25}; do
-    if curl -s -I "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
-        break
-    fi
-    sleep 0.2
-done
-
-open "http://127.0.0.1:$PORT/"
-wait "$SERVER_PID"
-"""
-    launcher_file = macos / "launcher"
-    launcher_file.write_text(launcher, encoding="utf-8")
-    launcher_file.chmod(0o755)
-
-    if shutil.which("codesign"):
-        subprocess.run(["codesign", "--force", "--deep", "-s", "-", str(app_bundle)], check=True)
-        print("[✓] Ad-hoc signed: Visual Reference App.app")
-
+    icns_path = app_bundle / "Contents" / "Resources" / "AppIcon.icns"
     # Build DMG
     if shutil.which("hdiutil"):
         staging = DIST / "dmg_staging"
@@ -191,14 +142,6 @@ wait "$SERVER_PID"
         )
         shutil.rmtree(staging)
         print(f"[✓] Built DMG: {dmg_path.name} ({dmg_path.stat().st_size / (1024*1024):.2f} MB)")
-
-    # Zip macOS app
-    zip_app = DIST / "Visual-Reference-App-macOS.zip"
-    subprocess.run(
-        ["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(app_bundle), str(zip_app)],
-        check=True
-    )
-    print(f"[✓] Built macOS ZIP: {zip_app.name} ({zip_app.stat().st_size / (1024*1024):.2f} MB)")
 
     # Portable package
     portable = DIST / "Visual-Reference-Workflow"
@@ -250,4 +193,10 @@ Web interface: http://127.0.0.1:8765
 
 
 if __name__ == "__main__":
-    build_macos_app()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--app-only", action="store_true", help="Build the .app and desktop ZIP")
+    parser.add_argument("--archive-dir", type=Path, help="Preselect a local media archive")
+    parser.add_argument("--previous-workspace", type=Path, help="Copy an existing database on first launch")
+    parser.add_argument("--sdk-path", type=Path, help="Build with a specified macOS SDK")
+    args = parser.parse_args()
+    build_macos_app(args.archive_dir, args.previous_workspace, args.app_only, args.sdk_path)

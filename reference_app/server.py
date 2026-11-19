@@ -6,7 +6,10 @@ from urllib.parse import urlparse, unquote, parse_qs, quote
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent
-DB=ROOT/'references.sqlite3'
+DATA_ROOT=Path(os.environ.get('REFERENCE_DATA_DIR') or ROOT).expanduser().resolve()
+DATA_ROOT.mkdir(parents=True,exist_ok=True)
+DB=DATA_ROOT/'references.sqlite3'
+UPLOADS=DATA_ROOT/'uploads'
 configured_archive=os.environ.get('REFERENCE_ARCHIVE_DIR')
 ARCHIVE_ROOTS=(Path(configured_archive).expanduser().resolve(),) if configured_archive else (
  ROOT.parent, ROOT, Path.home()/'Desktop'/'instagram_archive'
@@ -29,7 +32,7 @@ def resolve_media(url):
  path=unquote(parsed.path)
  if path.startswith('/archive/'): return archive_file(path[len('/archive/'):])
  if path.startswith('/media/'):
-  base=(ROOT/'uploads').resolve()
+  base=UPLOADS.resolve()
   target=(base/path[len('/media/'):]).resolve()
   if target.is_relative_to(base) and target.is_file(): return target
  return None
@@ -128,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
   if path in ('/','/app.js','/style.css','/board.js','/studio.js','/workspace.js','/workflow.js','/clover-original.jpg','/ballerina-original.jpg'):
    f=ROOT/('index.html' if path=='/' else path[1:]); self.send(200,f.read_bytes(),mimetypes.guess_type(f.name)[0]+'; charset=utf-8'); return
   if path.startswith('/media/'):
-   base=(ROOT/'uploads').resolve(); f=(base/unquote(path[len('/media/'):])).resolve()
+   base=UPLOADS.resolve(); f=(base/unquote(path[len('/media/'):])).resolve()
    if f.is_relative_to(base) and f.is_file(): self.video_file(f); return
    return self.js(404,{'error':'Не найдено'})
   if path.startswith('/fonts/'):
@@ -166,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
    data=self.read_json()
    if action=='clip':
     source=resolve_media(data.get('preview',''))
-    url=workflow.extract_clip(source,ROOT/'uploads',data.get('start'),data.get('end'))
+    url=workflow.extract_clip(source,UPLOADS,data.get('start'),data.get('end'))
     return self.js(201,{'url':url})
    if action=='search':
     query=str(data.get('query') or '')[:250]
@@ -193,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
     if suffix not in workflow.VIDEO_EXTENSIONS | workflow.IMAGE_EXTENSIONS | {'.mp3'}: raise ValueError('Поддерживаются JPG, PNG, GIF, WebP, MP3, MP4, WebM, MOV и OGV')
     size=int(self.headers.get('Content-Length','0'))
     if size<=0 or size>512*1024*1024: raise ValueError('Размер файла должен быть от 1 байта до 512 МБ')
-    folder=ROOT/'uploads'; folder.mkdir(exist_ok=True); target=folder/(str(uuid.uuid4())+suffix)
+    folder=UPLOADS; folder.mkdir(exist_ok=True); target=folder/(str(uuid.uuid4())+suffix)
     try:
      with target.open('xb') as out:
       remaining=size
