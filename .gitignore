@@ -22,7 +22,6 @@ reference_app/uploads/*
 # Media & Archives (kept local, not committed to public git)
 images
 images/
-archive_index.json
 downloads/
 archive/
 _system/
@@ -43,3 +42,12 @@ _system/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Local reference archives and application data
+archive_index.json
+videos/
+/uploads/
+*.sqlite3
+*.sqlite3-*
+.venv/
+.env.*

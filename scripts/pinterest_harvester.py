@@ -165,7 +165,7 @@ def main():
     parser = argparse.ArgumentParser(description="Pinterest Harvester for Visual Reference Pipeline")
     parser.add_argument("--rss", help="URL of Pinterest board RSS feed")
     parser.add_argument("--pins-json", help="Path to JSON file containing list of pin objects")
-    parser.add_argument("--author", default="millyrock2900 (Pinterest)", help="Default author tag")
+    parser.add_argument("--author", default="Pinterest", help="Default author tag")
     parser.add_argument("--category", default="Референсы", help="Default category")
     parser.add_argument("--output", default="~/Desktop/instagram_archive/images/Референсы")
     parser.add_argument("--index", default="~/Desktop/instagram_archive/archive_index.json")

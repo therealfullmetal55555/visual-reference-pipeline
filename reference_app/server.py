@@ -130,6 +130,11 @@ class Handler(BaseHTTPRequestHandler):
    with db() as c: self.js(200,[dict(r) for r in c.execute('SELECT * FROM refs ORDER BY added DESC, rowid DESC')]); return
   if path in ('/','/app.js','/style.css','/board.js','/studio.js','/workspace.js','/workflow.js','/clover-original.jpg','/ballerina-original.jpg'):
    f=ROOT/('index.html' if path=='/' else path[1:]); self.send(200,f.read_bytes(),mimetypes.guess_type(f.name)[0]+'; charset=utf-8'); return
+  if path in ('/apple-touch-icon.png','/favicon.ico','/favicon-16x16.png','/favicon-32x32.png'):
+   f=ROOT/path[1:]
+   if f.is_file():
+    self.send(200,f.read_bytes(),'image/png' if f.suffix=='.png' else 'image/x-icon'); return
+   return self.js(404,{'error':'Не найдено'})
   if path.startswith('/media/'):
    base=UPLOADS.resolve(); f=(base/unquote(path[len('/media/'):])).resolve()
    if f.is_relative_to(base) and f.is_file(): self.video_file(f); return
