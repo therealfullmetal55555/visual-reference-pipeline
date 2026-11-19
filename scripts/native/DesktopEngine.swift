@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import SwiftUI
 import ImageIO
@@ -16,6 +17,9 @@ final class DesktopEngine: @unchecked Sendable {
     private var writer: FileHandle?
     private var reader: FileHandle?
     private var buffered = Data()
+    private let workerScript: URL?
+
+    init(workerScript: URL? = nil) { self.workerScript = workerScript }
     static let dataDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Visual Reference Workflow", isDirectory: true)
 
@@ -30,18 +34,14 @@ final class DesktopEngine: @unchecked Sendable {
                     }
                     var line = try JSONSerialization.data(withJSONObject: request)
                     line.append(10)
-                    try writer.write(contentsOf: line)
-                    while !self.buffered.contains(10) {
-                        guard let new = try reader.read(upToCount: 65_536), !new.isEmpty else {
-                            throw DesktopError("Внутренний процесс завершился. Проверьте Python и доступ к данным.")
-                        }
-                        self.buffered.append(new)
+                    let response: Any
+                    do {
+                        try writer.write(contentsOf: line)
+                        response = try self.readReply(from: reader)
+                    } catch {
+                        self.stop()
+                        throw error
                     }
-                    guard let newline = self.buffered.firstIndex(of: 10) else {
-                        throw DesktopError("Пустой ответ движка.")
-                    }
-                    let response = try JSONSerialization.jsonObject(with: Data(self.buffered[..<newline]))
-                    self.buffered.removeSubrange(...newline)
                     guard let object = response as? [String: Any], object["ok"] as? Bool == true else {
                         throw DesktopError((response as? [String: Any])?["error"] as? String ?? "Ошибка рабочего процесса.")
                     }
@@ -53,10 +53,42 @@ final class DesktopEngine: @unchecked Sendable {
         }
     }
 
+    private func readReply(from handle: FileHandle) throws -> Any {
+        let deadline = DispatchTime.now().uptimeNanoseconds + 125_000_000_000
+        var chunk = [UInt8](repeating: 0, count: 32_768)
+        while true {
+            if let newline = buffered.firstIndex(of: 10) {
+                let line = Data(buffered[..<newline])
+                buffered.removeSubrange(...newline)
+                return try JSONSerialization.jsonObject(with: line)
+            }
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline else {
+                throw DesktopError("Движок не ответил. Повторите загрузку или проверьте доступ к папке архива.")
+            }
+            guard buffered.count < 32 * 1024 * 1024 else {
+                throw DesktopError("Слишком большой ответ при чтении архива.")
+            }
+            var descriptor = pollfd(fd: handle.fileDescriptor, events: Int16(POLLIN), revents: 0)
+            let ready = Darwin.poll(&descriptor, 1, Int32((deadline - now + 999_999) / 1_000_000))
+            if ready < 0 && errno == EINTR { continue }
+            if ready == 0 {
+                throw DesktopError("Движок не ответил. Повторите загрузку или проверьте доступ к папке архива.")
+            }
+            if ready < 0 || (descriptor.revents & Int16(POLLIN)) == 0 {
+                throw DesktopError("Движок закрыл соединение. Проверьте Python и доступ к папке данных.")
+            }
+            let count = chunk.withUnsafeMutableBytes { Darwin.read(handle.fileDescriptor, $0.baseAddress, $0.count) }
+            if count < 0 && errno == EINTR { continue }
+            guard count > 0 else { throw DesktopError("Движок завершился во время загрузки.") }
+            buffered.append(contentsOf: chunk.prefix(count))
+        }
+    }
+
     private func start(archive: String) throws {
         stop()
         let env = ProcessInfo.processInfo.environment
-        guard let script = Bundle.main.url(forResource: "desktop_bootstrap", withExtension: "py", subdirectory: "app") else {
+        guard let script = workerScript ?? Bundle.main.url(forResource: "desktop_bootstrap", withExtension: "py", subdirectory: "app") else {
             throw DesktopError("В сборке отсутствует движок обработки.")
         }
         let embedded = Bundle.main.resourceURL?.appendingPathComponent("python/bin/python3").path
@@ -152,6 +184,7 @@ final class DesktopStore: ObservableObject {
     @Published var board: [NativeTile] = []
     @Published var error: String?
     @Published var loading = false
+    @Published var loadIssue: String?
     @Published var subscriptions: [[String: Any]] = []
     private let engine = DesktopEngine()
     private var archive: String
@@ -184,7 +217,14 @@ final class DesktopStore: ObservableObject {
         }
     }
 
+    func reload() async {
+        do { try await load() }
+        catch { loadIssue = error.localizedDescription }
+    }
+
     func load(archive changed: URL? = nil) async throws {
+        guard !loading else { return }
+        loadIssue = nil
         if let changed {
             archive = changed.path
             UserDefaults.standard.set(archive, forKey: "archiveDirectory")
@@ -216,7 +256,10 @@ final class DesktopStore: ObservableObject {
             error = "Выберите папку архива."
             return
         }
-        withError { try await self.load(archive: folder) }
+        Task {
+            do { try await load(archive: folder) }
+            catch { loadIssue = error.localizedDescription }
+        }
     }
 
     func importItem(_ file: URL, title: String = "", source: String = "", notes: String = "") async throws -> NativeReference {

@@ -62,13 +62,13 @@ def build_macos_app(archive=None, previous_workspace=None, app_only=False, sdk_p
     app_bundle = DIST / bundle_name
     plist = {
         "CFBundleExecutable": "VisualReference",
-        "CFBundleIconFile": "AppIcon",
+        "CFBundleIconFile": "DesktopAppIcon",
         "CFBundleIdentifier": "com.visualreference.app",
         "CFBundleName": "Visual Reference App",
         "CFBundleDisplayName": "Visual Reference App",
         "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": "1.1.0",
-        "CFBundleVersion": "2",
+        "CFBundleShortVersionString": "1.1.1",
+        "CFBundleVersion": "3",
         "LSMinimumSystemVersion": "13.0",
         "NSHighResolutionCapable": True,
         "NSDesktopFolderUsageDescription": "Открывает выбранный архив визуальных референсов.",
@@ -90,9 +90,9 @@ def build_macos_app(archive=None, previous_workspace=None, app_only=False, sdk_p
         app_dir.mkdir(parents=True)
         for name in ("desktop_bootstrap.py", "server.py", "workflow.py"):
             shutil.copy2(APP_SRC / name, app_dir / name)
-        icns_src = APP_SRC / "AppIcon.icns"
+        icns_src = APP_SRC / "DesktopAppIcon.icns"
         if icns_src.is_file():
-            shutil.copy2(icns_src, resources / "AppIcon.icns")
+            shutil.copy2(icns_src, resources / "DesktopAppIcon.icns")
         with (contents / "Info.plist").open("wb") as destination:
             plistlib.dump(plist, destination)
         sources = sorted((ROOT / "scripts" / "native").glob("*.swift"))
@@ -117,7 +117,7 @@ def build_macos_app(archive=None, previous_workspace=None, app_only=False, sdk_p
     if app_only:
         return
 
-    icns_path = app_bundle / "Contents" / "Resources" / "AppIcon.icns"
+    icns_path = app_bundle / "Contents" / "Resources" / "DesktopAppIcon.icns"
     # Build DMG
     if shutil.which("hdiutil"):
         staging = DIST / "dmg_staging"

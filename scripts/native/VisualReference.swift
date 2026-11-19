@@ -35,7 +35,7 @@ enum DesktopPage: String, CaseIterable, Identifiable {
 @MainActor
 struct VisualReferenceApp: App {
     @StateObject private var store = DesktopStore()
-    @AppStorage("appearance") private var appearance = "system"
+    @AppStorage("appearance") private var appearance = "dark"
 
     var body: some Scene {
         WindowGroup {
@@ -67,53 +67,47 @@ struct VisualReferenceApp: App {
 
 struct Workspace: View {
     @ObservedObject var store: DesktopStore
-    @State private var page: DesktopPage? = .archive
+    @State private var page: DesktopPage = .archive
+    @AppStorage("sidebarCollapsed") private var collapsed = false
+    @Environment(\.colorScheme) private var colorScheme
+    private var palette: WorkspacePalette { WorkspacePalette(dark:colorScheme == .dark) }
     @State private var preview: NativeReference?
     @State private var videoSeed: String?
     @State private var exampleSeed: String?
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $page) {
-                Section("Материалы") {
-                    ForEach([DesktopPage.archive, .board, .collections]) { item in
-                        Label(item.rawValue, systemImage: item.symbol).tag(item)
+        HStack(spacing:0) {
+            WorkspaceSidebar(palette:palette,page:$page,collapsed:$collapsed)
+            Rectangle().fill(palette.line).frame(width:1)
+            VStack(spacing:0) {
+                HStack(spacing:8) {
+                    Text(page.rawValue).font(.system(size:23,weight:.medium))
+                    Spacer()
+                    WorkspaceIcon(name:"folder",label:"Папка архива",palette:palette,action:store.chooseArchive)
+                    WorkspaceIcon(name:"plus",label:"Импорт файлов",palette:palette,action:store.importFiles)
+                }.padding(.horizontal,24).padding(.vertical,12)
+                Rectangle().fill(palette.line).frame(height:1)
+                Group {
+                    switch page {
+                    case .archive: ArchivePanel(store:store,palette:palette,preview:{ preview=$0 },openBoard:{
+                        store.place(store.selected)
+                        page = .board
+                    })
+                    case .board: BoardPanel(store:store,open:{ preview=$0 })
+                    case .collections: CollectionsPanel(store:store,open:{ preview=$0 })
+                    case .shots: ShotsPanel(store:store)
+                    case .timeline: TimelinePanel(store:store,initial:videoSeed)
+                    case .comparison: ComparePanel(store:store)
+                    case .search: SearchPanel(store:store,initial:exampleSeed,open:{ preview=$0 })
+                    case .review: ReviewPanel(store:store)
+                    case .editor: PhotoEditor(store:store)
+                    case .collage: CollagePanel(store:store)
                     }
-                }
-                Section("Инструменты") {
-                    ForEach([DesktopPage.shots, .timeline, .comparison, .search, .review, .editor, .collage]) { item in
-                        Label(item.rawValue, systemImage: item.symbol).tag(item)
-                    }
-                }
-            }
-            .listStyle(.sidebar)
-            .navigationTitle("Visual Reference")
-            .navigationSplitViewColumnWidth(min: 180, ideal: 215)
-        } detail: {
-            Group {
-                switch page ?? .archive {
-                case .archive: ArchivePanel(store: store, preview: { preview = $0 }, openBoard: {
-                    store.place(store.selected)
-                    page = .board
-                })
-                case .board: BoardPanel(store: store, open: { preview = $0 })
-                case .collections: CollectionsPanel(store: store, open: { preview = $0 })
-                case .shots: ShotsPanel(store: store)
-                case .timeline: TimelinePanel(store: store, initial: videoSeed)
-                case .comparison: ComparePanel(store: store)
-                case .search: SearchPanel(store: store, initial: exampleSeed, open: { preview = $0 })
-                case .review: ReviewPanel(store: store)
-                case .editor: PhotoEditor(store: store)
-                case .collage: CollagePanel(store: store)
-                }
-            }
-            .navigationTitle((page ?? .archive).rawValue)
-            .toolbar {
-                ToolbarItem { Button(action: store.importFiles) { Label("Импорт", systemImage: "plus") } }
-                ToolbarItem { Button(action: store.chooseArchive) { Label("Папка архива", systemImage: "folder") } }
-            }
-        }
-        .task { if store.items.isEmpty { store.withError { try await store.load() } } }
+                }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
+            }.frame(maxWidth:.infinity,maxHeight:.infinity)
+        }.background(palette.canvas)
+        .foregroundStyle(palette.text).tint(palette.text)
+        .task { if store.items.isEmpty { await store.reload() } }
         .alert("Рабочая область", isPresented: Binding(get: { store.error != nil }, set: {
             if !$0 { store.error = nil }
         })) { Button("OK") { store.error = nil } } message: { Text(store.error ?? "") }
@@ -134,19 +128,20 @@ struct Workspace: View {
 struct NativeMedia: View {
     let reference: NativeReference
     var fit = false
+    var tile = false
 
     var body: some View {
         Group {
-            if let image = nativeThumbnail(reference, size: fit ? 1600 : 480) {
+            if let image = nativeThumbnail(reference, size: fit && !tile ? 1600 : 480) {
                 Image(nsImage: image).resizable()
-                    .aspectRatio(contentMode: fit ? .fit : .fill)
+                    .aspectRatio(contentMode: fit && !tile ? .fit : .fill)
             } else if reference.kind == "Видео" {
                 Image(systemName: "play.rectangle").font(.system(size: 32)).foregroundStyle(.secondary)
             } else if reference.kind == "Аудио" {
                 Image(systemName: "waveform").font(.system(size: 28)).foregroundStyle(.secondary)
             } else if let url = reference.url, !url.isFileURL {
                 AsyncImage(url: url) { phase in
-                    if let image = phase.image { image.resizable().aspectRatio(contentMode: fit ? .fit : .fill) }
+                    if let image = phase.image { image.resizable().aspectRatio(contentMode: fit && !tile ? .fit : .fill) }
                     else { Image(systemName: "photo").foregroundStyle(.secondary) }
                 }
             } else {
@@ -208,59 +203,107 @@ struct NativeGIF: NSViewRepresentable {
 
 struct ArchivePanel: View {
     @ObservedObject var store: DesktopStore
+    let palette: WorkspacePalette
     let preview: (NativeReference) -> Void
     let openBoard: () -> Void
     @State private var query = ""
     @State private var filter = "Все"
     @State private var selecting = false
+    @State private var list = false
+    private let filters = ["Все","Фото","Видео","GIF","Аудио"]
 
     private var matches: [NativeReference] {
         store.items.filter { ref in
             let type = ref.preview.lowercased().contains(".gif") ? "GIF" : ref.kind
             return (filter == "Все" || type == filter)
-                && (query.isEmpty || [ref.title,ref.tags,ref.notes].joined(separator: " ").localizedCaseInsensitiveContains(query))
+                && (query.isEmpty || [ref.title,ref.tags,ref.notes].joined(separator:" ").localizedCaseInsensitiveContains(query))
         }
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Picker("Тип", selection: $filter) {
-                    ForEach(["Все","Фото","Видео","GIF","Аудио"],id:\.self) { Text($0).tag($0) }
-                }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 370)
-                Spacer()
-                TextField("Поиск по архиву", text: $query).frame(width: 220)
-                Toggle("Выбрать", isOn: $selecting).toggleStyle(.button)
-                Button("На доску (\(store.selection.count))", action: openBoard)
-                    .disabled(store.selection.isEmpty)
-            }.padding([.top,.horizontal],16)
-            if store.loading { ProgressView("Читаем архив…").padding() }
-            if matches.isEmpty && !store.loading {
-                Text("Нет подходящих материалов").foregroundStyle(.secondary).frame(maxHeight: .infinity)
+        let results=matches
+        VStack(spacing:0) {
+            HStack(spacing:8) {
+                ForEach(filters,id:\.self) { item in
+                    Button { filter=item } label: {
+                        Text(item).font(.system(size:12)).padding(.horizontal,11).frame(height:31)
+                    }.buttonStyle(MonoButton(palette:palette,active:filter==item,outlined:false))
+                }
+                Spacer(minLength:6)
+                HStack(spacing:7) {
+                    Image(systemName:"magnifyingglass").foregroundStyle(palette.muted)
+                    TextField("Поиск по архиву",text:$query).textFieldStyle(.plain)
+                }.padding(.horizontal,9).frame(width:195,height:35)
+                    .background(palette.surface,in:RoundedRectangle(cornerRadius:6))
+                    .overlay { RoundedRectangle(cornerRadius:6).strokeBorder(palette.line) }
+                WorkspaceIcon(name:list ? "square.grid.2x2" : "list.bullet",label:list ? "Сетка" : "Список",palette:palette,action:{ list.toggle() })
+                WorkspaceIcon(name:"checkmark.circle",label:"Выбрать материалы",palette:palette,active:selecting,action:{ selecting.toggle() })
+                if !store.selection.isEmpty {
+                    Button(action:openBoard) {
+                        Text("На доску (\(store.selection.count))").font(.system(size:12)).padding(.horizontal,9).frame(height:35)
+                    }.buttonStyle(MonoButton(palette:palette,active:true))
+                }
+            }.padding(.horizontal,24).padding(.vertical,14)
+            if let issue=store.loadIssue {
+                VStack(spacing:12) {
+                    Text("Архив не загрузился").font(.title3)
+                    Text(issue).font(.callout).foregroundStyle(palette.muted)
+                    HStack {
+                        Button("Повторить") { Task { await store.reload() } }
+                        Button("Выбрать папку",action:store.chooseArchive)
+                    }
+                }.frame(maxWidth:.infinity,maxHeight:.infinity).padding(20)
+            } else if store.loading {
+                ProgressView("Читаем архив…").frame(maxWidth:.infinity,maxHeight:.infinity)
+            } else if results.isEmpty {
+                VStack(spacing:10) {
+                    Text(store.items.isEmpty ? "Архив пуст" : "Ничего не найдено").foregroundStyle(palette.muted)
+                    if store.items.isEmpty { Button("Выбрать папку",action:store.chooseArchive) }
+                }.frame(maxWidth:.infinity,maxHeight:.infinity)
             } else {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 155, maximum: 260), spacing: 10)], spacing: 12) {
-                        ForEach(matches) { ref in
-                            Button {
-                                if selecting || NSEvent.modifierFlags.contains(.command) { store.toggle(ref) }
-                                else { preview(ref) }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 5) {
-                                    NativeMedia(reference: ref).aspectRatio(1, contentMode: .fit)
-                                        .overlay(alignment: .topLeading) {
-                                            if store.selection.contains(ref.id) {
-                                                Image(systemName: "checkmark.circle.fill").padding(6)
-                                                    .background(.regularMaterial, in: Circle()).padding(6)
-                                            }
-                                        }
-                                    Text(ref.title).lineLimit(1).font(.caption)
-                                }
-                            }.buttonStyle(.plain).help(ref.title)
-                        }
-                    }.padding(.horizontal,16).padding(.bottom,16)
+                GeometryReader { geometry in
+                    ScrollView {
+                        let count=geometry.size.width<780 ? 3 : 4
+                        let columns=Array(repeating:GridItem(.flexible(),spacing:12),count:list ? 1 : count)
+                        LazyVGrid(columns:columns,spacing:12) {
+                            ForEach(results) { ref in card(ref) }
+                        }.padding(.horizontal,24).padding(.bottom,18)
+                    }
                 }
             }
         }
+    }
+
+    private func card(_ ref: NativeReference) -> some View {
+        let selected=store.selection.contains(ref.id)
+        return Button {
+            if selecting || NSEvent.modifierFlags.contains(.command) { store.toggle(ref) }
+            else { preview(ref) }
+        } label: {
+            if list {
+                HStack(spacing:12) {
+                    NativeMedia(reference:ref,fit:true).frame(width:58,height:42).clipShape(RoundedRectangle(cornerRadius:5))
+                    Text(ref.title).lineLimit(1)
+                    Spacer()
+                    Text(ref.kind).foregroundStyle(palette.muted)
+                    if selected { Image(systemName:"checkmark.circle.fill") }
+                }.padding(6).background(selected ? palette.selected : palette.surface,in:RoundedRectangle(cornerRadius:6))
+            } else {
+                GeometryReader { geometry in
+                    NativeMedia(reference:ref,fit:true,tile:true)
+                        .frame(width:geometry.size.width,height:geometry.size.height)
+                        .background(palette.surface)
+                        .clipShape(RoundedRectangle(cornerRadius:5))
+                        .overlay { RoundedRectangle(cornerRadius:5).strokeBorder(selected ? palette.text : palette.line) }
+                        .overlay(alignment:.topLeading) {
+                            if selected {
+                                Image(systemName:"checkmark.circle.fill").padding(6)
+                                    .foregroundStyle(Color.white).background(Color.black.opacity(0.8),in:Circle()).padding(7)
+                            }
+                        }
+                }.aspectRatio(1,contentMode:.fit)
+            }
+        }.buttonStyle(.plain).help(ref.title).accessibilityLabel(ref.title)
     }
 }
 

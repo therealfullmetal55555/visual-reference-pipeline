@@ -130,6 +130,16 @@ def build_macos_master_1024(clover_emblem: Image.Image) -> Image.Image:
     return canvas
 
 
+def build_desktop_icon(clover_emblem: Image.Image) -> Image.Image:
+    """A single large tile with the same clover mark, for the native macOS app."""
+    size = 904
+    tile, _ = build_macos_tile(clover_emblem, tile_size=size, radius=201)
+    canvas = Image.new("RGBA", (1024, 1024))
+    margin = (1024 - size) // 2
+    canvas.alpha_composite(tile, (margin, margin))
+    return canvas
+
+
 def build_windows_master_512(clover_emblem: Image.Image) -> Image.Image:
     """Build Windows 11 Fluent 512x512 master (tight 22px margin, 468px squircle)."""
     canvas_size = 512
@@ -299,4 +309,7 @@ if __name__ == "__main__":
     base_dir = Path(__file__).resolve().parents[1]
     clover = base_dir / "reference_app" / "clover-original.jpg"
     out_dir = base_dir / "reference_app"
-    generate_all_icons(clover, out_dir)
+    if sys.argv[1:] == ["--desktop-only"]:
+        build_desktop_icon(extract_clover_emblem(clover)).save(out_dir / "DesktopAppIcon.icns", format="ICNS")
+    else:
+        generate_all_icons(clover, out_dir)
